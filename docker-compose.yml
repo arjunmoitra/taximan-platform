@@ -1,0 +1,26 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: taximan-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-taximan}
+      MYSQL_USER: ${MYSQL_USER:-taximan}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-taximan}
+    command: >
+      --local-infile=1
+      --innodb-buffer-pool-size=512M
+      --transaction-isolation=REPEATABLE-READ
+      --log-bin-trust-function-creators=1
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql-data:
