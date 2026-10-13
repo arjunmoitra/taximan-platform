@@ -10,7 +10,7 @@ help: ## show targets
 venv: ## create the virtualenv and install the package with dev extras
 	python3 -m venv .venv
 	$(PY) -m pip install -q --upgrade pip
-	$(PY) -m pip install -q -e ".[dev]"
+	$(PY) -m pip install -q -e ".[dev,warehouse]"
 	@# macOS sometimes marks files under dot-directories hidden and Python 3.12 then ignores the .pth file
 	@chflags -R nohidden .venv 2>/dev/null || true
 
@@ -46,3 +46,21 @@ test: ## run the test suite against the taximan_test database
 	MYSQL_DATABASE=taximan_test $(PY) -m pytest -q -p no:warnings
 
 bootstrap: venv db-up migrate seed ## everything from zero to a seeded database
+
+# --- optional Snowflake layer, see docs/WAREHOUSE.md ------------------------
+warehouse-setup: ## create the Snowflake warehouse, database, schemas and stage (once)
+	$(PY) -m taximan.cli warehouse setup
+
+warehouse-extract: ## export the PII free Parquet extract from MySQL to data/warehouse
+	$(PY) -m taximan.cli warehouse extract
+
+warehouse-load: ## recreate the RAW tables in Snowflake and load the extract
+	$(PY) -m taximan.cli warehouse load
+
+warehouse-build: ## create the ANALYTICS views in Snowflake
+	$(PY) -m taximan.cli warehouse build
+
+warehouse-check: ## reconcile Snowflake against MySQL, exits 1 on any mismatch
+	$(PY) -m taximan.cli warehouse check
+
+warehouse: warehouse-extract warehouse-load warehouse-build warehouse-check ## extract, load, build and check

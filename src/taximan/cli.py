@@ -1,6 +1,8 @@
 """Command line entry point: `taximan --help`."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 
@@ -70,6 +72,112 @@ def lab(which: str = typer.Argument(..., help="lost-update | double-booking | di
     if not path.exists():
         raise typer.BadParameter(f"unknown lab {which}; choose one of {[p.stem for p in root.glob('*.py')]}")
     runpy.run_path(str(path), run_name="__main__")
+
+warehouse_app = typer.Typer(
+    help="Optional Snowflake analytics layer. Needs: pip install -e '.[warehouse]'",
+    no_args_is_help=True,
+)
+app.add_typer(warehouse_app, name="warehouse")
+
+
+def _snowflake(with_context: bool = True):
+    from .warehouse.config import ConfigError, SnowflakeConfig
+    from .warehouse.load import connect as sf_connect
+
+    try:
+        cfg = SnowflakeConfig.from_env()
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print(f"connecting to Snowflake as {cfg.user} ({cfg.auth_method})")
+    return sf_connect(cfg, with_context=with_context)
+
+
+@warehouse_app.command("setup")
+def warehouse_setup():
+    """Create the Snowflake warehouse, database, schemas, file format and stage (idempotent)."""
+    from .warehouse import load
+
+    conn = _snowflake(with_context=False)
+    try:
+        load.setup(conn)
+    finally:
+        conn.close()
+    console.print("snowflake objects are in place")
+
+
+@warehouse_app.command("extract")
+def warehouse_extract(out: Path = typer.Option(None, help="directory for the Parquet files")):
+    """Export the allowlisted, PII free columns from MySQL to Parquet."""
+    from .warehouse.extract import WAREHOUSE_DIR, extract_all
+
+    counts = extract_all(out or WAREHOUSE_DIR)
+    console.print({k: f"{v:,}" for k, v in counts.items()})
+
+
+@warehouse_app.command("load")
+def warehouse_load(src: Path = typer.Option(None, help="directory holding the Parquet files")):
+    """Recreate the RAW tables and load the extract (PUT then COPY INTO)."""
+    from .warehouse import load
+    from .warehouse.extract import WAREHOUSE_DIR
+
+    conn = _snowflake()
+    try:
+        loaded = load.load_raw(conn, src or WAREHOUSE_DIR)
+    finally:
+        conn.close()
+    console.print({k: f"{v:,}" for k, v in loaded.items()})
+
+
+@warehouse_app.command("build")
+def warehouse_build():
+    """Create the ANALYTICS views."""
+    from .warehouse import load
+
+    conn = _snowflake()
+    try:
+        names = load.build_views(conn)
+    finally:
+        conn.close()
+    console.print(f"created {len(names)} views: {', '.join(names)}")
+
+
+@warehouse_app.command("check")
+def warehouse_check():
+    """Reconcile Snowflake against MySQL. Exits 1 if any number differs."""
+    from .db import connect
+    from .warehouse import load
+    from .warehouse.reconcile import reconcile
+
+    def mysql_one(sql: str):
+        cur = mysql.cursor()
+        try:
+            cur.execute(sql)
+            return cur.fetchone()
+        finally:
+            cur.close()
+
+    mysql = connect()
+    sf = _snowflake()
+    try:
+        results = reconcile(mysql_one, load.run_one(sf))
+    finally:
+        mysql.close()
+        sf.close()
+    bad = [r for r in results if not r.ok]
+    for r in bad:
+        console.print(f"[red]MISMATCH[/red] {r.table} {r.expression}: mysql={r.source} snowflake={r.target}")
+    console.print(f"{len(results) - len(bad)} of {len(results)} checks match")
+    if bad:
+        raise typer.Exit(1)
+
+
+@warehouse_app.command("all")
+def warehouse_all():
+    """Extract, load, build and check in one go (run `setup` once first)."""
+    warehouse_extract(out=None)
+    warehouse_load(src=None)
+    warehouse_build()
+    warehouse_check()
 
 
 if __name__ == "__main__":
