@@ -79,7 +79,7 @@ def main() -> None:
         with transaction() as conn:
             row = fetch_one(conn, "SELECT status, trip FROM lab_slots WHERE driver_id = 1")
         n = sum(1 for w in wins if w is True)
-        verdict = "[red]DOUBLE BOOKED, both transactions believe they own the driver[/red]" if n == 2 else "[green]exactly one winner[/green]"
+        verdict = "[red]DOUBLE BOOKED, both transactions believe they own the driver[/red]" if n == 2 else "[green]CORRECT, exactly one winner[/green]"
         console.print(f"winners={n}  final row={row}   {verdict}\n")
 
     with transaction() as conn:
