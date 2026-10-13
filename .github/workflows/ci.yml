@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,warehouse]"
       - name: enable local_infile and trigger creation on the service container
         run: |
           python - <<'EOF'

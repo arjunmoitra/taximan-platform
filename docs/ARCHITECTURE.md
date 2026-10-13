@@ -163,5 +163,6 @@ services.py          --parameterised SQL, one transaction per operation-->  same
 api.py               --FastAPI-->  services.py
 db/analytics/*.sql   --taximan analytics / GET /analytics/{name}-->  same
 concurrency/*.py     --two raw connections racing-->  same
+warehouse/           --taximan warehouse extract / load / build / check-->  Snowflake RAW and ANALYTICS (optional, see WAREHOUSE.md)
 tests/               --pytest, own database taximan_test-->  same
 ```

@@ -11,7 +11,7 @@ lock that fixes each.
 
 ```
 make bootstrap      # venv, MySQL in Docker, migrations, 300k trips of seed data
-make test           # 51 tests against a real MySQL, ~7 seconds
+make test           # 162 tests against a real MySQL, about a minute
 make analytics      # the 12 queries
 make lab            # the concurrency demonstrations
 make serve          # FastAPI on http://127.0.0.1:8000/docs
@@ -30,8 +30,9 @@ make serve          # FastAPI on http://127.0.0.1:8000/docs
 | Data | `src/taximan/generate.py` | 20k riders, 2.5k drivers, 300k trips over a year, loaded with `LOAD DATA LOCAL INFILE` while every trigger fires |
 | Analytics | `db/analytics/*.sql` | 12 queries with joins, CTEs and window functions, all under 2 s on the full seed |
 | Concurrency | `concurrency/` | lost update, double booking and dispatcher starvation, each reproduced and fixed, with the precedence graphs in `SCHEDULES.md` |
-| Tests | `tests/` | 51 tests: constraints, state machine, rules, dataset integrity, races, analytics, HTTP |
-| CI | `.github/workflows/ci.yml` | MySQL service container, pytest, and the lab must print CORRECT |
+| Warehouse | `warehouse/`, `src/taximan/warehouse/`, [docs/WAREHOUSE.md](docs/WAREHOUSE.md) | optional Snowflake layer: PII free Parquet extract, typed `RAW` tables, the 12 queries ported to views, reconciliation against MySQL, and a parity test that checks every view against its MySQL original |
+| Tests | `tests/` | 162 tests: constraints, state machine, rules, dataset integrity, races, analytics, HTTP, and the warehouse layer. 3 strict `xfail` tests record a known gap in the generated data |
+| CI | `.github/workflows/ci.yml` | MySQL service container, pytest including the Snowflake parity tests, and the lab must print CORRECT |
 
 ## The schema
 
@@ -141,7 +142,8 @@ seed. Each file has the question in its header. A few:
 | origin destination flow, top 3 destinations per origin | self join of zones, `RANK() OVER (PARTITION BY)` |
 
 `make analytics` prints all twelve with timings. `GET /analytics/{name}`
-serves them as JSON.
+serves them as JSON. The same twelve are ported to Snowflake views and checked
+against these originals, see [docs/WAREHOUSE.md](docs/WAREHOUSE.md).
 
 ## API
 
@@ -196,15 +198,20 @@ make serve                    # then open http://127.0.0.1:8000/docs
 the seed. Use `SCALE=0.1 make seed` for a smaller dataset. Every command is
 also available as `taximan <command>` inside the virtualenv.
 
+The Snowflake layer is optional and needs your own account. `make warehouse-extract`
+works without one and writes the PII free Parquet files. See
+[docs/WAREHOUSE.md](docs/WAREHOUSE.md) for the rest.
+
 ## Layout
 
 ```
 db/migrations/      001_schema.sql  002_triggers.sql  003_views.sql
 db/analytics/       01 .. 12 .sql
-src/taximan/        config.py db.py migrate.py services.py pricing.py generate.py analytics.py api.py cli.py
+warehouse/          snowflake/ 01_setup.sql 02_raw_tables.sql analytics/ (12 views and as_of)
+src/taximan/        config.py db.py migrate.py services.py pricing.py generate.py analytics.py api.py cli.py warehouse/
 concurrency/        lost_update.py double_booking.py dispatch.py SCHEDULES.md
-tests/              9 test modules, 51 tests
-docs/               ARCHITECTURE.md
+tests/              15 test modules, 162 tests, tests/warehouse/ for the Snowflake layer
+docs/               ARCHITECTURE.md WAREHOUSE.md
 ```
 
 ## Origins
