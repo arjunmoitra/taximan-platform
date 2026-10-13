@@ -6,7 +6,7 @@ WITH earnings AS (
            COUNT(*)                         AS trips,
            SUM(t.fare_cents)                AS gross_cents,
            SUM(t.distance_km)               AS km,
-           SUM(t.duration_sec) / 3600.0     AS hours_on_trip
+           SUM(t.duration_sec)              AS seconds_on_trip
       FROM trips t
      WHERE t.status = 'completed'
        AND t.completed_at >= UTC_TIMESTAMP() - INTERVAL 30 DAY
@@ -17,7 +17,9 @@ SELECT RANK() OVER (ORDER BY e.gross_cents DESC)                 AS rnk,
        v.make, v.model,
        e.trips,
        ROUND(e.gross_cents / 100, 2)                              AS gross_dollars,
-       ROUND(e.gross_cents / 100 / NULLIF(e.hours_on_trip, 0), 2) AS dollars_per_hour,
+       -- gross dollars per hour on trip is gross_cents * 36 / seconds. One division only:
+       -- dividing seconds by 3600.0 first rounds to 4 decimals in MySQL and skews short trips.
+       ROUND(e.gross_cents * 36 / NULLIF(e.seconds_on_trip, 0), 2) AS dollars_per_hour,
        ROUND(e.km, 1)                                             AS km,
        ROUND(d.rating_sum / NULLIF(d.rating_count, 0), 2)         AS rating,
        ROUND(e.gross_cents / AVG(e.gross_cents) OVER (), 2)       AS x_avg_driver

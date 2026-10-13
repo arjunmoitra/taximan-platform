@@ -9,7 +9,7 @@ SELECT z.name                                                       AS pickup_zo
        SUM(t.cancel_reason = 'no_driver')                           AS no_driver,
        SUM(t.cancel_reason = 'system')                              AS by_system,
        ROUND(100 * SUM(t.status = 'cancelled') / SUM(SUM(t.status = 'cancelled')) OVER (), 1) AS share_of_all_cancels,
-       RANK() OVER (ORDER BY SUM(t.status = 'cancelled') / COUNT(*) DESC)   AS worst_rank
+       RANK() OVER (ORDER BY CAST(SUM(t.status = 'cancelled') AS DOUBLE) / COUNT(*) DESC) AS worst_rank
   FROM trips t
   JOIN zones z ON z.id = t.pickup_zone_id
  WHERE t.requested_at >= UTC_TIMESTAMP() - INTERVAL 90 DAY

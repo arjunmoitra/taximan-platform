@@ -4,7 +4,7 @@
 WITH hist AS (
     SELECT t.driver_id,
            r.score,
-           ROW_NUMBER() OVER (PARTITION BY t.driver_id ORDER BY r.created_at DESC) AS recency
+           ROW_NUMBER() OVER (PARTITION BY t.driver_id ORDER BY r.created_at DESC, r.id DESC) AS recency
       FROM ratings r
       JOIN trips t ON t.id = r.trip_id
      WHERE r.rated_by = 'rider'

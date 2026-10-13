@@ -6,7 +6,7 @@ WITH spend AS (
       JOIN payments p ON p.trip_id = t.id AND p.status = 'captured'
      GROUP BY t.rider_id
 )
-SELECT ROW_NUMBER() OVER (ORDER BY s.spent_cents DESC)                                  AS rnk,
+SELECT ROW_NUMBER() OVER (ORDER BY s.spent_cents DESC, s.rider_id)                                  AS rnk,
        u.full_name,
        z.name                                                                           AS home_zone,
        s.trips,

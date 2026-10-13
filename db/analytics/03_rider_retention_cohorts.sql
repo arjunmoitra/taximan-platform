@@ -9,7 +9,10 @@ WITH first_month AS (
 ),
 activity AS (
     SELECT t.rider_id,
-           TIMESTAMPDIFF(MONTH, f.cohort_month, t.requested_at) AS months_since_signup
+           -- Calendar months, not TIMESTAMPDIFF(MONTH): that truncates toward zero, so a trip up to
+           -- a month before the cohort month would be counted as month 0. PERIOD_DIFF is signed.
+           PERIOD_DIFF(EXTRACT(YEAR_MONTH FROM t.requested_at),
+                       EXTRACT(YEAR_MONTH FROM f.cohort_month)) AS months_since_signup
       FROM trips t
       JOIN first_month f ON f.user_id = t.rider_id
      WHERE t.status = 'completed'
