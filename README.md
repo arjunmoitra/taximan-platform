@@ -1,5 +1,7 @@
 # Taximan
 
+[![ci](https://github.com/arjunmoitra/taximan-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/arjunmoitra/taximan-platform/actions/workflows/ci.yml)
+
 A ride hailing data platform on MySQL 8, built the way a production system
 relies on its database: a normalised schema with foreign keys, CHECK
 constraints and purpose chosen indexes; business rules enforced by triggers so
